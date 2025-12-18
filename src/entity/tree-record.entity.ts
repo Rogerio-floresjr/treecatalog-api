@@ -2,7 +2,7 @@ import { Entity, Column, PrimaryColumn } from "typeorm";
 
 @Entity('tree_records')
 export class TreeRecord {
-    @Column()
+    @Column({ nullable: true }) 
     id: number;
 
     @PrimaryColumn({ name: 'unique_id' })
