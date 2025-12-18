@@ -1,4 +1,4 @@
-import { Repository } from "typeorm";
+import { Repository, Brackets } from "typeorm";
 import { ITreeService, TreeCreateRequest, TreeQueryParams, TreeServiceResponse, TreeSyncRequest, TreeSyncResponse, TreeValidationError } from "../interfaces/tree.interface";
 import { TreeRecord } from "../entity/tree-record.entity";
 import { v4 as uuidv4 } from 'uuid';
@@ -166,25 +166,32 @@ export class TreeService implements ITreeService {
         try {
             const queryBuilder = this.treeRepository.createQueryBuilder('tree_records');
 
-            // --- FILTROS  ---
+            // Filtros existentes
             if (params.userId) {
                 queryBuilder.andWhere('tree_records.userId = :userId', { userId: params.userId });
             }
             if (params.cidade) {
                 queryBuilder.andWhere('tree_records.cidade ILIKE :cidade', { cidade: `%${params.cidade}%` });
             }
-            
-            // Se o frontend não mandar page/limit, usamos padrão: Página 1, 50 itens.
+
+            if (params.search) {
+                queryBuilder.andWhere(new Brackets(qb => {
+                    qb.where('tree_records.cidade ILIKE :search', { search: `%${params.search}%` })
+                      .orWhere('tree_records.nomePopular ILIKE :search', { search: `%${params.search}%` })
+                      .orWhere('tree_records.userName ILIKE :search', { search: `%${params.search}%` })
+                      .orWhere('tree_records.cep ILIKE :search', { search: `%${params.search}%` })
+                      .orWhere('tree_records.numeroArvore ILIKE :search', { search: `%${params.search}%` }) // Busca por ID também
+                }));
+            }
+
+            // Paginação Obrigatória
             const page = params.page ? Number(params.page) : 1;
             const limit = params.limit ? Number(params.limit) : 50; 
             const skip = (page - 1) * limit;
 
             queryBuilder.skip(skip).take(limit);
-            
-            // Ordenação para garantir consistência (Mais recentes primeiro)
-            queryBuilder.orderBy('tree_records.data_cadastro', 'DESC');
+            queryBuilder.orderBy('tree_records.dataCadastro', 'DESC');
 
-            // Executa a query com limite
             const [trees, total] = await queryBuilder.getManyAndCount();
 
             return {
@@ -192,8 +199,8 @@ export class TreeService implements ITreeService {
                 message: 'Tree retrieved successfully',
                 data: trees,
                 total,
-                page,   // Retorna página atual
-                limit   // Retorna limite usado
+                page,
+                limit
             };
         } catch (error) {
             console.error('Tree retrieval error:', error);
