@@ -166,6 +166,25 @@ export class TreeService implements ITreeService {
         try {
             const queryBuilder = this.treeRepository.createQueryBuilder('tree_records');
 
+            // --- FILTROS  ---
+            if (params.userId) {
+                queryBuilder.andWhere('tree_records.userId = :userId', { userId: params.userId });
+            }
+            if (params.cidade) {
+                queryBuilder.andWhere('tree_records.cidade ILIKE :cidade', { cidade: `%${params.cidade}%` });
+            }
+            
+            // Se o frontend não mandar page/limit, usamos padrão: Página 1, 50 itens.
+            const page = params.page ? Number(params.page) : 1;
+            const limit = params.limit ? Number(params.limit) : 50; 
+            const skip = (page - 1) * limit;
+
+            queryBuilder.skip(skip).take(limit);
+            
+            // Ordenação para garantir consistência (Mais recentes primeiro)
+            queryBuilder.orderBy('tree_records.data_cadastro', 'DESC');
+
+            // Executa a query com limite
             const [trees, total] = await queryBuilder.getManyAndCount();
 
             return {
@@ -173,8 +192,10 @@ export class TreeService implements ITreeService {
                 message: 'Tree retrieved successfully',
                 data: trees,
                 total,
+                page,   // Retorna página atual
+                limit   // Retorna limite usado
             };
-        }catch (error) {
+        } catch (error) {
             console.error('Tree retrieval error:', error);
             return {
                 success: false,
