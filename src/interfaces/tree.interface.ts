@@ -73,6 +73,7 @@ export interface TreeQueryParams {
     quadra?: string;
     cidade?: string;
     estado?: string;
+    search?: string;
 }
 
 export interface TreeServiceResponse<T = any> {
