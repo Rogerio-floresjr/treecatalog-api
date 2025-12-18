@@ -243,7 +243,10 @@ export async function treeRoutes(fastify: FastifyInstance) {
                         message: { type: 'string' },
                         data: { 
                             type: 'array',
-                            items: { type: 'object' }
+                            items: { 
+                                type: 'object',
+                                additionalProperties: true 
+                            }
                         },
                         total: { type: 'number' },
                         page: { type: 'number' },
