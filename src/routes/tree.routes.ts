@@ -223,7 +223,9 @@ export async function treeRoutes(fastify: FastifyInstance) {
                     limit: { type: 'integer', minimum: 1, maximum: 100 },
                     quadra: { type: 'string' },
                     cidade: { type: 'string' },
-                    estado: { type: 'string' }
+                    estado: { type: 'string' },
+                    search: { type: 'string' }
+                    
                 }
             },
             response: {
