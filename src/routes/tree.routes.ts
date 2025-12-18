@@ -213,6 +213,41 @@ export async function treeRoutes(fastify: FastifyInstance) {
         }
     }, treeController.deleteTree);
 
+    // Get trees with pagination and filtering
+    fastify.get('/trees', {
+        schema: {
+            querystring: {
+                type: 'object',
+                properties: {
+                    page: { type: 'integer', minimum: 1 },
+                    limit: { type: 'integer', minimum: 1, maximum: 100 },
+                    quadra: { type: 'string' },
+                    cidade: { type: 'string' },
+                    estado: { type: 'string' }
+                }
+            },
+            response: {
+                200: {
+                    type: 'object',
+                    properties: {
+                        success: { type: 'boolean' },
+                        message: { type: 'string' },
+                        data: { 
+                            type: 'array',
+                            items: { 
+                                type: 'object',
+                                additionalProperties: true 
+                            }
+                        },
+                        total: { type: 'number' },
+                        page: { type: 'number' },
+                        limit: { type: 'number' }
+                    }
+                }
+            }
+        }
+    }, treeController.getTrees);
+
     // Get trees by user
     fastify.get('/users/:userId/trees', {
         schema: {
