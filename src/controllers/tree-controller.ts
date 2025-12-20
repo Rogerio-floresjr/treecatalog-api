@@ -39,6 +39,7 @@ export class TreeController {
         this.getUserTrees = this.getUserTrees.bind(this);
         this.deleteTree = this.deleteTree.bind(this);
         this.syncTrees = this.syncTrees.bind(this);
+        this.getDashboard = this.getDashboard.bind(this);
     }
 
     // Extract user from JWT token
