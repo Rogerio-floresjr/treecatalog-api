@@ -1,15 +1,14 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyReply, FastifyRequest } from 'fastify';
 import { Repository } from 'typeorm';
+import AppDataSource from '../config/db';
 import { TreeRecord } from '../entity/tree-record.entity';
 import { Users } from '../entity/user.entity';
-import { 
-    TreeCreateRequest, 
-    TreeUpdateRequest, 
-    TreeSyncRequest, 
-    TreeQueryParams 
-} from '../interfaces/tree.interface';
 import { AuthConfig } from '../interfaces/auth.interface';
-import AppDataSource from '../config/db';
+import {
+    TreeCreateRequest,
+    TreeQueryParams,
+    TreeSyncRequest
+} from '../interfaces/tree.interface';
 import { AuthService } from '../services/auth-service';
 import { TreeService } from '../services/tree-service';
 
@@ -163,6 +162,19 @@ export class TreeController {
             });
         }
     }
+
+    // Dashboard data handler
+    async getDashboard(request: FastifyRequest, reply: FastifyReply) {
+    try {
+        const user = await this.extractUserFromToken(request);
+        if (!user) return reply.code(401).send({ success: false, message: 'Auth required' });
+
+        const result = await this.treeService.getDashboardData(user.id);
+        return reply.code(200).send(result);
+    } catch (error) {
+        return reply.code(500).send({ success: false, message: 'Server error' });
+    }
+}
 
     // Get trees by user
     async getUserTrees(
