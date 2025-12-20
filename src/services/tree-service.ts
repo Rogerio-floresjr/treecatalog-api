@@ -214,65 +214,71 @@ export class TreeService implements ITreeService {
     }
 
     // Dashboard da tab home
+    
     async getDashboardData(userId: string): Promise<TreeServiceResponse<DashboardStatsResponse>> {
         try {
-            // 1. Estatísticas Gerais (Totais)
-            const totalTrees = await this.treeRepository.count();
-            
-            const totalCitiesResult = await this.treeRepository
-                .createQueryBuilder('tree')
-                .select('COUNT(DISTINCT tree.cidade)', 'count')
-                .getRawOne();
+            // Executamos todas as queries em PARALELO usando Promise.all
+            // Isso reduz drasticamente o tempo de espera
+            const [
+                totalTrees, 
+                totalCitiesResult, 
+                totalStatesResult, 
+                recentRecords, 
+                rawPoints,
+                chartData
+            ] = await Promise.all([
+                // 1. Total Geral
+                this.treeRepository.count(),
                 
-            const totalStatesResult = await this.treeRepository
-                .createQueryBuilder('tree')
-                .select('COUNT(DISTINCT tree.estado)', 'count')
-                .getRawOne();
+                // 2. Cidades Únicas
+                this.treeRepository
+                    .createQueryBuilder('tree')
+                    .select('COUNT(DISTINCT tree.cidade)', 'count')
+                    .getRawOne(),
+                
+                // 3. Estados Únicos
+                this.treeRepository
+                    .createQueryBuilder('tree')
+                    .select('COUNT(DISTINCT tree.estado)', 'count')
+                    .getRawOne(),
+                
+                // 4. Registros Recentes (Top 5)
+                this.treeRepository.find({
+                    order: { dataCadastro: 'DESC' },
+                    take: 5
+                }),
 
-            // 2. Registros Recentes (Top 5)
-            const recentRecords = await this.treeRepository.find({
-                order: { dataCadastro: 'DESC' },
-                take: 5
-            });
+                // 5. Pontos do Mapa (Leve)
+                this.treeRepository
+                    .createQueryBuilder('tree')
+                    .select(['tree.uniqueId', 'tree.latitude', 'tree.longitude', 'tree.nomePopular'])
+                    .where("tree.latitude != '' AND tree.longitude != ''")
+                    .getMany(),
 
-            // 3. Pontos do Mapa (Leve: só lat/long/id)
-            //const mapPoints = await this.treeRepository
-            //    .createQueryBuilder('tree')
-            //    .select(['tree.uniqueId', 'tree.latitude', 'tree.longitude', 'tree.nomePopular'])
-            //    .where("tree.latitude != '' AND tree.longitude != ''")
-            //    .getMany();
-            // 3. Pontos do Mapa (Leve: só lat/long/id)
-            const rawPoints = await this.treeRepository
-                .createQueryBuilder('tree')
-                .select(['tree.uniqueId', 'tree.latitude', 'tree.longitude', 'tree.nomePopular'])
-                .where("tree.latitude != '' AND tree.longitude != ''")
-                .getMany();
+                // 6. Gráfico Agrupado via SQL (Muito mais rápido que JS)
+                this.treeRepository
+                    .createQueryBuilder('tree')
+                    .select("SUBSTRING(tree.dataCadastro, 1, 7)", "month") // Pega YYYY-MM
+                    .addSelect("COUNT(*)", "count")
+                    .groupBy("month")
+                    .orderBy("month", "DESC")
+                    .limit(6)
+                    .getRawMany()
+            ]);
 
-            // Mapeia para garantir que segue a interface (tratando nulos)
+            // Processamento Leve dos Resultados
             const mapPoints = rawPoints.map(point => ({
                 uniqueId: point.uniqueId,
                 latitude: point.latitude,
                 longitude: point.longitude,
-                nomePopular: point.nomePopular || 'Sem identificação' // <--- Correção aqui
+                nomePopular: point.nomePopular || 'Sem identificação' 
             }));
 
-            // 4. Dados para o Gráfico 
-            const allDates = await this.treeRepository.find({ select: ['dataCadastro'] });
-            
-            const chartMap = new Map<string, number>();
-            allDates.forEach(record => {
-                if(record.dataCadastro) {
-                    // formato ISO (2025-12-19...) Pega os primeiros 7 chars (YYYY-MM)
-                    const monthKey = record.dataCadastro.substring(0, 7); 
-                    chartMap.set(monthKey, (chartMap.get(monthKey) || 0) + 1);
-                }
-            });
-
-            // Transforma em array e ordena (pega os últimos 6 meses para o gráfico não ficar gigante)
-            const recentActivity = Array.from(chartMap.entries())
-                .sort()
-                .slice(-6) 
-                .map(([label, value]) => ({ label, value }));
+            // Formata o gráfico (Inverte para ordem cronológica: Jan -> Fev -> Mar)
+            const recentActivity = chartData.map(item => ({
+                label: item.month, // Ex: "2024-12"
+                value: parseInt(item.count)
+            })).reverse();
 
             return {
                 success: true,
@@ -280,8 +286,8 @@ export class TreeService implements ITreeService {
                 data: {
                     stats: {
                         totalTrees,
-                        totalCities: parseInt(totalCitiesResult.count),
-                        totalStates: parseInt(totalStatesResult.count)
+                        totalCities: parseInt(totalCitiesResult?.count || '0'),
+                        totalStates: parseInt(totalStatesResult?.count || '0')
                     },
                     recentRecords,
                     mapPoints,
