@@ -236,11 +236,25 @@ export class TreeService implements ITreeService {
             });
 
             // 3. Pontos do Mapa (Leve: só lat/long/id)
-            const mapPoints = await this.treeRepository
+            //const mapPoints = await this.treeRepository
+            //    .createQueryBuilder('tree')
+            //    .select(['tree.uniqueId', 'tree.latitude', 'tree.longitude', 'tree.nomePopular'])
+            //    .where("tree.latitude != '' AND tree.longitude != ''")
+            //    .getMany();
+            // 3. Pontos do Mapa (Leve: só lat/long/id)
+            const rawPoints = await this.treeRepository
                 .createQueryBuilder('tree')
                 .select(['tree.uniqueId', 'tree.latitude', 'tree.longitude', 'tree.nomePopular'])
                 .where("tree.latitude != '' AND tree.longitude != ''")
                 .getMany();
+
+            // Mapeia para garantir que segue a interface (tratando nulos)
+            const mapPoints = rawPoints.map(point => ({
+                uniqueId: point.uniqueId,
+                latitude: point.latitude,
+                longitude: point.longitude,
+                nomePopular: point.nomePopular || 'Sem identificação' // <--- Correção aqui
+            }));
 
             // 4. Dados para o Gráfico 
             const allDates = await this.treeRepository.find({ select: ['dataCadastro'] });
