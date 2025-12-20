@@ -34,12 +34,12 @@ export async function treeRoutes(fastify: FastifyInstance) {
             probabilidade: { type: 'string' },
             impacto: { type: 'string' },
             areaPermeavelMaior1m2: { type: 'string' },
-            // CHANGED: presencaDe now accepts array of strings
+            
             presencaDe: { 
                 type: 'array',
                 items: { type: 'string' }
             },
-            // CHANGED: conflitos now accepts array of strings
+            
             conflitos: { 
                 type: 'array',
                 items: { type: 'string' }
@@ -63,6 +63,8 @@ export async function treeRoutes(fastify: FastifyInstance) {
             lastSyncTimestamp: { type: 'string' }
         }
     };
+
+    fastify.get('/dashboard', treeController.getDashboard);
 
     // Create a new tree
     fastify.post('/trees', {
@@ -225,7 +227,6 @@ export async function treeRoutes(fastify: FastifyInstance) {
                     cidade: { type: 'string' },
                     estado: { type: 'string' },
                     search: { type: 'string' }
-                    
                 }
             },
             response: {
@@ -248,7 +249,7 @@ export async function treeRoutes(fastify: FastifyInstance) {
                 }
             }
         }
-    }, treeController.getTrees);
+    }, treeController.getTrees); 
 
     // Get trees by user
     fastify.get('/users/:userId/trees', {
