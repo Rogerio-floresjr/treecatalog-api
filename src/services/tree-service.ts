@@ -217,48 +217,37 @@ export class TreeService implements ITreeService {
     
     async getDashboardData(userId: string): Promise<TreeServiceResponse<DashboardStatsResponse>> {
         try {
-            // Executamos todas as queries em PARALELO usando Promise.all
-            // Isso reduz drasticamente o tempo de espera
-            const [
-                totalTrees, 
-                totalCitiesResult, 
-                totalStatesResult, 
-                recentRecords, 
-                rawPoints,
-                chartData
-            ] = await Promise.all([
-                // 1. Total Geral
-                this.treeRepository.count(),
+            // Executa as 3 queries essenciais em paralelo para máxima performance
+            const [recentRecordsResult, mapPointsResult, chartDataResult] = await Promise.all([
                 
-                // 2. Cidades Únicas
-                this.treeRepository
-                    .createQueryBuilder('tree')
-                    .select('COUNT(DISTINCT tree.cidade)', 'count')
-                    .getRawOne(),
-                
-                // 3. Estados Únicos
-                this.treeRepository
-                    .createQueryBuilder('tree')
-                    .select('COUNT(DISTINCT tree.estado)', 'count')
-                    .getRawOne(),
-                
-                // 4. Registros Recentes (Top 5)
+                // 1. Widget Lista: Apenas os 5 últimos
                 this.treeRepository.find({
+                    select: {
+                        uniqueId: true,
+                        nomePopular: true,
+                        nomeCientifico: true,
+                        dataCadastro: true
+                    },
                     order: { dataCadastro: 'DESC' },
                     take: 5
                 }),
 
-                // 5. Pontos do Mapa (Leve)
+                // 2. Widget Mapa: Apenas as 50 últimas coletas com Lat/Long válidos
                 this.treeRepository
                     .createQueryBuilder('tree')
                     .select(['tree.uniqueId', 'tree.latitude', 'tree.longitude', 'tree.nomePopular'])
-                    .where("tree.latitude != '' AND tree.longitude != ''")
+                    // Garante que não pegamos árvores sem localização
+                    .where("tree.latitude IS NOT NULL AND tree.latitude != ''")
+                    .andWhere("tree.longitude IS NOT NULL AND tree.longitude != ''")
+                    .orderBy('tree.dataCadastro', 'DESC')
+                    .take(50) // Limite rígido de 50 pinos
                     .getMany(),
 
-                // 6. Gráfico Agrupado via SQL (Muito mais rápido que JS)
+                // 3. Widget Gráfico: Agrupamento por mês via SQL
+                // Extrai o 'YYYY-MM' da string de data e conta
                 this.treeRepository
                     .createQueryBuilder('tree')
-                    .select("SUBSTRING(tree.dataCadastro, 1, 7)", "month") // Pega YYYY-MM
+                    .select("SUBSTRING(tree.dataCadastro, 1, 7)", "month") 
                     .addSelect("COUNT(*)", "count")
                     .groupBy("month")
                     .orderBy("month", "DESC")
@@ -266,32 +255,34 @@ export class TreeService implements ITreeService {
                     .getRawMany()
             ]);
 
-            // Processamento Leve dos Resultados
-            const mapPoints = rawPoints.map(point => ({
+            // --- TRATAMENTO DE DADOS ---
+            const formattedRecentRecords = recentRecordsResult.map(record => ({
+                uniqueId: record.uniqueId,
+                nomePopular: record.nomePopular || 'Sem identificação',
+                nomeCientifico: record.nomeCientifico || '',
+                dataCadastro: record.dataCadastro
+            }));
+
+            const formattedMapPoints = mapPointsResult.map(point => ({
                 uniqueId: point.uniqueId,
                 latitude: point.latitude,
                 longitude: point.longitude,
-                nomePopular: point.nomePopular || 'Sem identificação' 
+                nomePopular: point.nomePopular || 'Árvore'
             }));
 
-            // Formata o gráfico (Inverte para ordem cronológica: Jan -> Fev -> Mar)
-            const recentActivity = chartData.map(item => ({
-                label: item.month, // Ex: "2024-12"
-                value: parseInt(item.count)
+            // Formata o gráfico (Inverte para ordem cronológica: Jan -> Fev)
+            const formattedChart = chartDataResult.map(item => ({
+                label: item.month, 
+                value: parseInt(item.count) 
             })).reverse();
 
             return {
                 success: true,
                 message: 'Dashboard data retrieved',
                 data: {
-                    stats: {
-                        totalTrees,
-                        totalCities: parseInt(totalCitiesResult?.count || '0'),
-                        totalStates: parseInt(totalStatesResult?.count || '0')
-                    },
-                    recentRecords,
-                    mapPoints,
-                    recentActivity
+                    recentRecords: formattedRecentRecords,
+                    mapPoints: formattedMapPoints,
+                    recentActivity: formattedChart
                 }
             };
 
@@ -301,6 +292,7 @@ export class TreeService implements ITreeService {
         }
     }
 
+    
     // Function to get tree by user ID
     async getTreesByUser(userId: string, params?: TreeQueryParams): Promise<TreeServiceResponse> {
         return this.getTrees({ ...params, userId })
