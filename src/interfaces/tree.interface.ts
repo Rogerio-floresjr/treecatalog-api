@@ -33,6 +33,22 @@ export interface TreeCreateRequest {
     photos?: string[];
 }
 
+export interface DashboardStatsResponse {
+    stats: {
+        totalTrees: number;
+        totalCities: number;
+        totalStates: number;
+    };
+    recentActivity: any[]; // Gráfico (Mês/Total)
+    recentRecords: any[]; // Lista dos 5 últimos
+    mapPoints: Array<{
+        uniqueId: string;
+        latitude: string;
+        longitude: string;
+        nomePopular: string;
+    }>;
+}
+
 export interface TreeUpdateRequest extends Partial<TreeCreateRequest> {
     uniqueId: string;
 }
