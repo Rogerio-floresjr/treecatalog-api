@@ -1,9 +1,10 @@
+import cors from '@fastify/cors';
 import 'dotenv/config';
 import Fastify from 'fastify';
-import cors from '@fastify/cors';
 import AppDataSource from './config/db';
 import { authRoutes } from './routes/auth.routes';
 import { treeRoutes } from './routes/tree.routes';
+import { userRoutes } from './routes/user.routes';
 
 const fastify = Fastify({
     logger: true 
@@ -33,7 +34,8 @@ async function startServer() {
         console.log('Data Source has been initialized!');
         
         await fastify.register(authRoutes, { prefix: '/auth' });
-        await fastify.register(treeRoutes, { prefix: '/api' })
+        await fastify.register(treeRoutes, { prefix: '/api' });
+        await fastify.register(userRoutes, { prefix: '/users' });
         
         await fastify.listen({ 
             port: port,
