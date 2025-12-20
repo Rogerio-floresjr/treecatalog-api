@@ -1,7 +1,7 @@
-import { Repository, Brackets } from "typeorm";
-import { ITreeService, TreeCreateRequest, TreeQueryParams, TreeServiceResponse, TreeSyncRequest, TreeSyncResponse, TreeValidationError } from "../interfaces/tree.interface";
-import { TreeRecord } from "../entity/tree-record.entity";
+import { Brackets, Repository } from "typeorm"; // <--- Importe Brackets
 import { v4 as uuidv4 } from 'uuid';
+import { TreeRecord } from "../entity/tree-record.entity";
+import { ITreeService, TreeCreateRequest, TreeQueryParams, TreeServiceResponse, TreeSyncRequest, TreeSyncResponse, TreeValidationError } from "../interfaces/tree.interface";
 
 export class TreeService implements ITreeService {
     private treeRepository: Repository<TreeRecord>;
@@ -174,6 +174,7 @@ export class TreeService implements ITreeService {
                 queryBuilder.andWhere('tree_records.cidade ILIKE :cidade', { cidade: `%${params.cidade}%` });
             }
 
+            
             if (params.search) {
                 queryBuilder.andWhere(new Brackets(qb => {
                     qb.where('tree_records.cidade ILIKE :search', { search: `%${params.search}%` })
@@ -183,6 +184,7 @@ export class TreeService implements ITreeService {
                       .orWhere('tree_records.numeroArvore ILIKE :search', { search: `%${params.search}%` }) // Busca por ID também
                 }));
             }
+            
 
             // Paginação Obrigatória
             const page = params.page ? Number(params.page) : 1;
@@ -208,6 +210,74 @@ export class TreeService implements ITreeService {
                 success: false,
                 message: 'Failed to retrieve trees'
             }
+        }
+    }
+
+    // Dashboard da tab home
+    async getDashboardData(userId: string): Promise<TreeServiceResponse<DashboardStatsResponse>> {
+        try {
+            // 1. Estatísticas Gerais (Totais)
+            const totalTrees = await this.treeRepository.count();
+            
+            const totalCitiesResult = await this.treeRepository
+                .createQueryBuilder('tree')
+                .select('COUNT(DISTINCT tree.cidade)', 'count')
+                .getRawOne();
+                
+            const totalStatesResult = await this.treeRepository
+                .createQueryBuilder('tree')
+                .select('COUNT(DISTINCT tree.estado)', 'count')
+                .getRawOne();
+
+            // 2. Registros Recentes (Top 5)
+            const recentRecords = await this.treeRepository.find({
+                order: { dataCadastro: 'DESC' },
+                take: 5
+            });
+
+            // 3. Pontos do Mapa (Leve: só lat/long/id)
+            const mapPoints = await this.treeRepository
+                .createQueryBuilder('tree')
+                .select(['tree.uniqueId', 'tree.latitude', 'tree.longitude', 'tree.nomePopular'])
+                .where("tree.latitude != '' AND tree.longitude != ''")
+                .getMany();
+
+            // 4. Dados para o Gráfico 
+            const allDates = await this.treeRepository.find({ select: ['dataCadastro'] });
+            
+            const chartMap = new Map<string, number>();
+            allDates.forEach(record => {
+                if(record.dataCadastro) {
+                    // formato ISO (2025-12-19...) Pega os primeiros 7 chars (YYYY-MM)
+                    const monthKey = record.dataCadastro.substring(0, 7); 
+                    chartMap.set(monthKey, (chartMap.get(monthKey) || 0) + 1);
+                }
+            });
+
+            // Transforma em array e ordena (pega os últimos 6 meses para o gráfico não ficar gigante)
+            const recentActivity = Array.from(chartMap.entries())
+                .sort()
+                .slice(-6) 
+                .map(([label, value]) => ({ label, value }));
+
+            return {
+                success: true,
+                message: 'Dashboard data retrieved',
+                data: {
+                    stats: {
+                        totalTrees,
+                        totalCities: parseInt(totalCitiesResult.count),
+                        totalStates: parseInt(totalStatesResult.count)
+                    },
+                    recentRecords,
+                    mapPoints,
+                    recentActivity
+                }
+            };
+
+        } catch (error) {
+            console.error('Dashboard error:', error);
+            return { success: false, message: 'Failed to load dashboard' };
         }
     }
 
