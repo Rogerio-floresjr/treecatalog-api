@@ -1,7 +1,7 @@
-import { Brackets, Repository } from "typeorm"; // <--- Importe Brackets
+import { Brackets, Repository } from "typeorm";
 import { v4 as uuidv4 } from 'uuid';
 import { TreeRecord } from "../entity/tree-record.entity";
-import { ITreeService, TreeCreateRequest, TreeQueryParams, TreeServiceResponse, TreeSyncRequest, TreeSyncResponse, TreeValidationError } from "../interfaces/tree.interface";
+import { DashboardStatsResponse, ITreeService, TreeCreateRequest, TreeQueryParams, TreeServiceResponse, TreeSyncRequest, TreeSyncResponse, TreeValidationError } from "../interfaces/tree.interface";
 
 export class TreeService implements ITreeService {
     private treeRepository: Repository<TreeRecord>;
