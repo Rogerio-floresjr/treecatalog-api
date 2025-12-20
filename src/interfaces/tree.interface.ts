@@ -34,19 +34,19 @@ export interface TreeCreateRequest {
 }
 
 export interface DashboardStatsResponse {
-    stats: {
-        totalTrees: number;
-        totalCities: number;
-        totalStates: number;
-    };
-    recentActivity: any[]; // Gráfico (Mês/Total)
-    recentRecords: any[]; // Lista dos 5 últimos
-    mapPoints: Array<{
+    recentActivity: { label: string; value: number }[]; 
+    recentRecords: {
+        uniqueId: string;
+        nomePopular: string;
+        nomeCientifico: string;
+        dataCadastro: string;
+    }[];
+    mapPoints: {
         uniqueId: string;
         latitude: string;
         longitude: string;
         nomePopular: string;
-    }>;
+    }[];
 }
 
 export interface TreeUpdateRequest extends Partial<TreeCreateRequest> {
